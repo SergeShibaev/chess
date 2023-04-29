@@ -16,6 +16,7 @@ CChessEngine::CChessEngine(DWORD TimePerMove, bool bWhite)
 	, m_TimePerMove(TimePerMove)
 {
 	m_Position.reserve(30);
+	m_Response.resize(0x1000);
 }
 
 
@@ -62,8 +63,6 @@ int CChessEngine::Init(const std::wstring& path)
 		return ERR_BADPROCESS;
 	}
 
-	CHECK_CALL(Query("uci"));
-
 	m_bInited = true;
 
 	return ERR_NOERROR;
@@ -73,6 +72,8 @@ int CChessEngine::Init(const std::wstring& path)
 ///////////////////////////////////////////////////////////////////////////////
 int CChessEngine::Query(const std::string& query) const
 {
+	//std::cout << query << std::endl;
+
 	DWORD Bytes;
 	if (!WriteFile(m_pIn.w, query.c_str(), static_cast<DWORD>(query.size()), &Bytes, nullptr))
 		return ERR_WRITE;
@@ -82,29 +83,52 @@ int CChessEngine::Query(const std::string& query) const
 
 
 ///////////////////////////////////////////////////////////////////////////////
-int CChessEngine::GetResponse(std::string& response, const std::vector<std::string>& expect) const
+int CChessEngine::GetResponse(const std::vector<std::string>& expect)
 {
 	DWORD Bytes;
 	DWORD BytesAvail;
 	DWORD BytesLeft;
-	std::string Response;
+	DWORD cnt = 0;
 
-	Response.resize(0x10000);
+	m_Response.clear();
+	m_Response.resize(0x1000);
 
 	while (true)
 	{
-		if (!PeekNamedPipe(m_pOut.r, (LPVOID)Response.data(), static_cast<DWORD>(Response.size()), &Bytes, &BytesAvail, &BytesLeft))
+		if (!PeekNamedPipe(m_pOut.r, (LPVOID)m_Response.data(), static_cast<DWORD>(m_Response.size()), &Bytes, &BytesAvail, &BytesLeft))
 			return ERR_READ;
 
-		if (!ReadFile(m_pOut.r, (LPVOID)Response.data(), static_cast<DWORD>(Response.size()), &Bytes, nullptr))
+		if (BytesLeft == 0)
+			break;
+
+		if (Bytes > m_Response.size())
+		{
+			m_Response.resize(Bytes);
+			continue;
+		}
+
+		if (!ReadFile(m_pOut.r, (LPVOID)m_Response.data(), static_cast<DWORD>(m_Response.size()), &Bytes, nullptr))
 			return ERR_READ;
 
 		if (expect.empty())
 			break;
 
 		for (const std::string s : expect) {
-			if (Response.rfind(s) != std::string::npos)
+			if (m_Response.rfind(s) != std::string::npos)
 				return ERR_NOERROR;
+		}
+
+		if (++cnt > 1000)
+		{
+			std::cerr << "Failed to get response";
+
+		  if (!expect.empty())
+				std::cerr << " for";
+
+			for (const std::string& s : expect)
+				std::cerr << " " << s;
+
+		  std::cerr << std::endl;
 		}
 	}
 
@@ -116,68 +140,45 @@ int CChessEngine::GetResponse(std::string& response, const std::vector<std::stri
 int CChessEngine::GetMove(std::string& move)
 {
 	CHECK_CALL(Query("position startpos moves " + m_Position + "\ngo\n"));
-	/*std::string query = "position startpos moves " + m_Position + "\ngo\n";
-
-	DWORD Bytes;
-	if (!WriteFile(m_pIn.w, query.c_str(), static_cast<DWORD>(query.size()), &Bytes, nullptr))
-		return ERR_WRITE;*/
 
 	Sleep(m_TimePerMove);
 
-	DWORD Bytes;
-	DWORD BytesAvail;
-	DWORD BytesLeft;
-	std::string Response;
-
-	Response.resize(0x10000);
-
-	CHECK_CALL(GetResponse(Response, { STR_BESTMOVE, STR_MATE }));
-
-	/*if (!PeekNamedPipe(m_pOut.r, (LPVOID)Response.data(), static_cast<DWORD>(Response.size()), &Bytes, &BytesAvail, &BytesLeft))
-		return ERR_READ;
-
-	if (!ReadFile(m_pOut.r, (LPVOID)Response.data(), static_cast<DWORD>(Response.size()), &Bytes, nullptr))
-		return ERR_READ;*/
+	CHECK_CALL(GetResponse({ STR_BESTMOVE, STR_MATE }));
 
 	size_t pos;
 
-	if ((pos = Response.rfind(STR_BESTMOVE)) == std::string::npos)
+	if ((pos = m_Response.rfind(STR_BESTMOVE)) == std::string::npos)
 	{
-		if ((pos = Response.rfind(STR_MATE)) == std::string::npos)
+		if ((pos = m_Response.rfind(STR_MATE)) == std::string::npos)
 		{
 			std::cout << "Unable to find best move..." << std::endl;
-			std::cout << Response.c_str() << std::endl;
+			std::cout << m_Response.c_str() << std::endl;
 			return ERR_BADMOVE;
 		}
-		m_Estimate = std::stoi(Response.c_str() + pos + sizeof(STR_MATE));
+		m_Estimate = std::stoi(m_Response.c_str() + pos + sizeof(STR_MATE));
 		return ERR_MATE;
 	}
 
 	pos += sizeof(STR_BESTMOVE);
-	const size_t length = Response.find_first_of(' ', pos) - pos;
-	move = Response.substr(pos, length);
+	const size_t length = m_Response.find_first_of(' ', pos) - pos;
+	move = m_Response.substr(pos, length);
 	AddMove(move);
 
-	if ((pos = Response.rfind(STR_SCORE)) == std::string::npos)
+	if ((pos = m_Response.rfind(STR_SCORE)) == std::string::npos)
 	{
-		if ((pos = Response.rfind(STR_MATE)) == std::string::npos)
+		if ((pos = m_Response.rfind(STR_MATE)) == std::string::npos)
 		{
 			std::cout << "Unable to find score cp..." << std::endl;
-			std::cout << Response.c_str() << std::endl;
+			std::cout << m_Response.c_str() << std::endl;
 			return ERR_BADMOVE;
 		}
-		m_Estimate = std::stoi(Response.c_str() + pos + sizeof(STR_MATE));
+		m_Estimate = std::stoi(m_Response.c_str() + pos + sizeof(STR_MATE));
 		return ERR_MATE;
 	}
 
-	m_Estimate = std::stoi(Response.c_str() + pos + sizeof(STR_SCORE));
+	m_Estimate = std::stoi(m_Response.c_str() + pos + sizeof(STR_SCORE));
 
 	++m_Move;
-
-	/*if ((pos = Response.rfind("info depth")) != std::string::npos)
-		std::cout << "\n" << Response.data() + pos << std::endl;
-	else
-		std::cout << "\n" << Response << std::endl;*/
 
 	return ERR_NOERROR;
 }

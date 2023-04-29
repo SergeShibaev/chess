@@ -5,6 +5,7 @@ class CChessEngine
 	CPipe					m_pIn;
 	CPipe					m_pOut;
 	CProcess			m_Proc;
+	std::string		m_Response;
 
 	bool					m_bInited;
 	std::string		m_Position;
@@ -32,7 +33,16 @@ public:
 	{
 		return m_bWhite ? m_Estimate : -1 * m_Estimate;
 	}
+
+  int ShowBoard()
+	{
+		CHECK_CALL(Query("d\n"));
+		Sleep(100);
+		CHECK_CALL(GetResponse({"Fen:"}));
+		std::cout << m_Response.substr(0, m_Response.find("Fen:")).c_str() << std::endl;
+		return ERR_NOERROR;
+	}
 private:
 	int Query(const std::string& query) const;
-	int GetResponse(std::string& response, const std::vector<std::string>& expect = "") const;
+	int GetResponse(const std::vector<std::string>& expect = {});
 };

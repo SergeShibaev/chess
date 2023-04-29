@@ -86,6 +86,7 @@ int main()
 			if (Status == ERR_MATE)
 			{
 				std::cout << "\nResign. Mate in " << Engine1.GetEstimate() << " moves" << std::endl;
+				Engine1.ShowBoard();
 				return ERR_NOERROR;
 			}
 			return Status;
@@ -99,15 +100,19 @@ int main()
 			if (Status == ERR_MATE)
 			{
 				std::cout << "\nResign. Mate in " << Engine2.GetEstimate() << " moves" << std::endl;
+				Engine2.ShowBoard();
 				return ERR_NOERROR;
 			}
 			return Status;
 		}
 		Engine1.AddMove(move);
 		std::cout << " " << move << " (" << Engine2.GetEstimate() * 0.01 << ")" << std::endl;
+
+		//Engine2.ShowBoard();
 	}
 
 	std::cout << "Game is too long. Draw!" << std::endl;
+	Engine1.ShowBoard();
 
 	/*while (MainWindow.isOpen())
 	{
