@@ -13,8 +13,9 @@ class CChessEngine
 	int						m_Estimate;
 	size_t				m_Move;
 	DWORD					m_TimePerMove;
+	std::string		m_FirstMove;
 public:
-	CChessEngine(DWORD TimePerMove, bool bWhite);
+	CChessEngine(DWORD TimePerMove, bool bWhite, const std::string& FirstMove = "");
 	~CChessEngine();
 
 	CChessEngine(const CChessEngine&) = delete;

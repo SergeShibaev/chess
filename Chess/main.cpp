@@ -65,7 +65,7 @@ int main()
 	LoadPosition(sFigures);
 
 	int Status;
-	CChessEngine Engine1(1000, true);
+	CChessEngine Engine1(1000, true, "e2e4");
 	const std::wstring EnginePath1 = L"..\\engines\\stockfish.exe";
 
 	if ((Status = Engine1.Init(EnginePath1)) != ERR_NOERROR)
@@ -108,11 +108,11 @@ int main()
 		Engine1.AddMove(move);
 		std::cout << " " << move << " (" << Engine2.GetEstimate() * 0.01 << ")" << std::endl;
 
-		//Engine2.ShowBoard();
+		Engine2.ShowBoard();
 	}
 
 	std::cout << "Game is too long. Draw!" << std::endl;
-	Engine1.ShowBoard();
+	Engine2.ShowBoard();
 
 	/*while (MainWindow.isOpen())
 	{

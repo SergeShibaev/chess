@@ -8,12 +8,13 @@
 #include "engine.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-CChessEngine::CChessEngine(DWORD TimePerMove, bool bWhite)
+CChessEngine::CChessEngine(DWORD TimePerMove, bool bWhite, const std::string& FirstMove)
 	: m_bInited(false)
 	, m_bWhite(bWhite)
 	, m_Estimate(0)
 	, m_Move(0)
 	, m_TimePerMove(TimePerMove)
+  , m_FirstMove(FirstMove)
 {
 	m_Position.reserve(30);
 	m_Response.resize(0x1000);
@@ -139,7 +140,9 @@ int CChessEngine::GetResponse(const std::vector<std::string>& expect)
 ///////////////////////////////////////////////////////////////////////////////
 int CChessEngine::GetMove(std::string& move)
 {
-	CHECK_CALL(Query("position startpos moves " + m_Position + "\ngo\n"));
+	const std::string query = m_Position.empty() && !m_FirstMove.empty() ? " searchmoves " + m_FirstMove : "";
+
+	CHECK_CALL(Query("position startpos moves " + m_Position + "\ngo" + query + "\n"));
 
 	Sleep(m_TimePerMove);
 
